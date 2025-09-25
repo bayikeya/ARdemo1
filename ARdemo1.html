@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>避難ルートARライン表示</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.150.0/build/three.min.js"></script>
+  </head>
+  <body style="margin:0; overflow:hidden;">
+    <a-scene
+      vr-mode-ui="enabled: false"
+      embedded
+      arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;">
+      
+      <!-- カメラ（GPS対応） -->
+      <a-camera gps-camera rotation-reader></a-camera>
+
+      <!-- ラインを配置するコンテナ -->
+      <a-entity id="route"></a-entity>
+    </a-scene>
+
+    <script>
+      // 避難ルート座標（例）
+      const routeCoords = [
+        { lat: 35.69297450074386,lon: 140.05096171248528 },
+        { lat: 35.69331376838943, lon: 140.0510149169646 },
+        { lat: 35.69340668315388,  lon: 140.05031945043197 }
+      ];
+
+      // ルート描画
+      const sceneEl = document.querySelector("a-scene");
+      sceneEl.addEventListener("loaded", () => {
+        const threeScene = sceneEl.object3D; // A-Frameの内部Three.jsシーン
+
+        // ユーザー位置を基準に座標変換
+        const camera = document.querySelector("[gps-camera]");
+        camera.addEventListener("gps-camera-update-position", (e) => {
+          // ユーザー現在地
+          const userLat = e.detail.position.latitude;
+          const userLon = e.detail.position.longitude;
+
+          // 座標変換 (緯度経度差 → m単位の相対座標に近似)
+          const coordsToVector3 = (lat, lon) => {
+            const R = 6378137; // 地球半径(m)
+            const dLat = (lat - userLat) * Math.PI / 180;
+            const dLon = (lon - userLon) * Math.PI / 180;
+            const x = dLon * R * Math.cos(userLat * Math.PI/180);
+            const z = dLat * R;
+            return new THREE.Vector3(x, 1, -z); // Z反転で前方
+          };
+
+          // ライン用の頂点配列
+          const points = routeCoords.map(p => coordsToVector3(p.lat, p.lon));
+
+          // ジオメトリとライン作成
+          const geometry = new THREE.BufferGeometry().setFromPoints(points);
+          const material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 5 });
+          const line = new THREE.Line(geometry, material);
+
+          threeScene.add(line);
+        }, { once: true });
+      });
+    </script>
+  </body>
+</html>
